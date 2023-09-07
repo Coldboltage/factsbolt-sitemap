@@ -1,26 +1,32 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CreateSitemapDto } from './dto/create-sitemap.dto';
 import { UpdateSitemapDto } from './dto/update-sitemap.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import Sitemapper from 'sitemapper';
 import { Site } from './entities/site-definitions';
+import { ClientProxy } from '@nestjs/microservices';
 
 @Injectable()
 export class SitemapService implements OnModuleInit {
+  constructor(@Inject('SITEMAP_EXTRACTOR') private client: ClientProxy) {}
   private readonly logger = new Logger(SitemapService.name);
 
-  onModuleInit() {
+  async onModuleInit() {
     console.log(`${SitemapService.name} has been initialized.`);
-    this.sitemapParse(
+    await this.sitemapChecker(
       'https://www.bbc.com/sitemaps/https-index-com-news.xml',
       Site.BBC,
     );
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
-  handleCron() {
+  async handleCron() {
     console.log('Hello');
     this.logger.debug(`Called at ${Date.now()}`);
+    await this.sitemapChecker(
+      'https://www.bbc.com/sitemaps/https-index-com-news.xml',
+      Site.BBC,
+    );
   }
 
   create(createSitemapDto: CreateSitemapDto) {
@@ -44,7 +50,6 @@ export class SitemapService implements OnModuleInit {
   }
 
   // Utilities
-
   async sitemapParse(sitemap: string, site: Site): Promise<string[]> {
     const siteMapLinks = new Sitemapper({
       url: sitemap,
@@ -72,5 +77,17 @@ export class SitemapService implements OnModuleInit {
       console.log(error);
     }
     return siteSpecLinks;
+  }
+
+  async sendSitemapLinks(urls: string[]) {
+    this.client.emit<string[]>('add_sites', urls);
+  }
+
+  async sitemapChecker(sitemap: string, site: Site) {
+    const sitemapLinks = await this.sitemapParse(sitemap, site);
+    if (sitemapLinks.length > 0) {
+      this.logger.debug('Sitemap Links Populated');
+      await this.sendSitemapLinks(sitemapLinks);
+    };
   }
 }
