@@ -19,7 +19,7 @@ export class SitemapService implements OnModuleInit {
     );
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async handleCron() {
     console.log('Hello');
     this.logger.debug(`Called at ${Date.now()}`);
@@ -56,6 +56,7 @@ export class SitemapService implements OnModuleInit {
       timeout: 15000, // 15 seconds
       requestHeaders: {},
       lastmod: Date.now() - 300000,
+      // lastmod: Date.now() - 1000000,
       debug: true,
     });
 
