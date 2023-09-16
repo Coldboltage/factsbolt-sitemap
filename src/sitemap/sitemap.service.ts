@@ -13,25 +13,25 @@ export class SitemapService implements OnModuleInit {
 
   async onModuleInit() {
     console.log(`${SitemapService.name} has been initialized.`);
-    // await this.sitemapChecker(
-    //   'https://www.bbc.com/sitemaps/https-index-com-news.xml',
-    //   Site.BBC,
-    // );
-    await this.fullsiteOneTimeChecker(
-      'https://www.bbc.com/sitemaps/https-sitemap-com-archive-102.xml',
-      Site.BBC,
-    );
-  }
-
-  @Cron(CronExpression.EVERY_5_MINUTES)
-  async handleCron() {
-    console.log('Hello');
-    this.logger.debug(`Called at ${Date.now()}`);
     await this.sitemapChecker(
       'https://www.bbc.com/sitemaps/https-index-com-news.xml',
       Site.BBC,
     );
+    // await this.fullsiteOneTimeChecker(
+    //   'https://www.bbc.com/sitemaps/https-sitemap-com-archive-102.xml',
+    //   Site.BBC,
+    // );
   }
+
+  // @Cron(CronExpression.EVERY_5_MINUTES)
+  // async handleCron() {
+  //   console.log('Hello');
+  //   this.logger.debug(`Called at ${Date.now()}`);
+  //   await this.sitemapChecker(
+  //     'https://www.bbc.com/sitemaps/https-index-com-news.xml',
+  //     Site.BBC,
+  //   );
+  // }
 
   create(createSitemapDto: CreateSitemapDto) {
     return 'This action adds a new sitemap';
@@ -98,7 +98,7 @@ export class SitemapService implements OnModuleInit {
     const sitemapLinks = await this.sitemapParse(
       sitemap,
       site,
-      Date.now() - 300000, // 5 minutes
+      Date.now() - 600000, // 5 minutes
     );
     if (sitemapLinks.length > 0) {
       this.logger.debug('Sitemap Links Populated');
