@@ -13,14 +13,15 @@ export class SitemapService implements OnModuleInit {
 
   async onModuleInit() {
     console.log(`${SitemapService.name} has been initialized.`);
-    await this.sitemapChecker(
-      'https://www.bbc.com/sitemaps/https-index-com-news.xml',
-      Site.BBC,
-    );
-    // await this.fullsiteOneTimeChecker(
-    //   'https://www.bbc.com/sitemaps/https-sitemap-com-archive-102.xml',
+    // await this.sitemapChecker(
+    //   'https://www.bbc.com/sitemaps/https-index-com-news.xml',
     //   Site.BBC,
     // );
+    if (process.env.FULL_SITE_CHECK === "true")
+      await this.fullsiteOneTimeChecker(
+        'https://www.bbc.com/sitemaps/https-sitemap-com-archive-102.xml',
+        Site.BBC,
+      );
   }
 
   // @Cron(CronExpression.EVERY_5_MINUTES)
@@ -78,7 +79,7 @@ export class SitemapService implements OnModuleInit {
       switch (site) {
         case Site.BBC:
           const filteredSites = result.sites.filter((url) => {
-            return url.includes('https://www.bbc.com/news/') ? true : false;
+            return url.includes('https://www.bbc.com/news/') && !url.includes('/live/') ? true : false;
           });
           siteSpecLinks.push(...filteredSites);
       }
