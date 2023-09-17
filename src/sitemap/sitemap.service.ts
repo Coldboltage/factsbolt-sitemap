@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CreateSitemapDto } from './dto/create-sitemap.dto';
 import { UpdateSitemapDto } from './dto/update-sitemap.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import Sitemapper from 'sitemapper';
+import Sitemapper, { SitemapperOptions } from 'sitemapper';
 import { Site } from './entities/site-definitions';
 import { ClientProxy } from '@nestjs/microservices';
 
@@ -13,21 +13,26 @@ export class SitemapService implements OnModuleInit {
 
   async onModuleInit() {
     console.log(`${SitemapService.name} has been initialized.`);
-    await this.sitemapChecker(
-      'https://www.bbc.com/sitemaps/https-index-com-news.xml',
-      Site.BBC,
-    );
+    // await this.sitemapChecker(
+    //   'https://www.bbc.com/sitemaps/https-index-com-news.xml',
+    //   Site.BBC,
+    // );
+    if (process.env.FULL_SITE_CHECK === "true")
+      await this.fullsiteOneTimeChecker(
+        'https://www.bbc.com/sitemaps/https-sitemap-com-archive-102.xml',
+        Site.BBC,
+      );
   }
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
-  async handleCron() {
-    console.log('Hello');
-    this.logger.debug(`Called at ${Date.now()}`);
-    await this.sitemapChecker(
-      'https://www.bbc.com/sitemaps/https-index-com-news.xml',
-      Site.BBC,
-    );
-  }
+  // @Cron(CronExpression.EVERY_5_MINUTES)
+  // async handleCron() {
+  //   console.log('Hello');
+  //   this.logger.debug(`Called at ${Date.now()}`);
+  //   await this.sitemapChecker(
+  //     'https://www.bbc.com/sitemaps/https-index-com-news.xml',
+  //     Site.BBC,
+  //   );
+  // }
 
   create(createSitemapDto: CreateSitemapDto) {
     return 'This action adds a new sitemap';
@@ -50,15 +55,21 @@ export class SitemapService implements OnModuleInit {
   }
 
   // Utilities
-  async sitemapParse(sitemap: string, site: Site): Promise<string[]> {
-    const siteMapLinks = new Sitemapper({
+  async sitemapParse(
+    sitemap: string,
+    site: Site,
+    lastmodTime?: number,
+  ): Promise<string[]> {
+    const sitemapOptions: SitemapperOptions = {
       url: sitemap,
       timeout: 15000, // 15 seconds
       requestHeaders: {},
-      lastmod: Date.now() - 300000,
-      // lastmod: Date.now() - 1000000,
       debug: true,
-    });
+    };
+
+    if (lastmodTime) sitemapOptions.lastmod = lastmodTime;
+
+    const siteMapLinks = new Sitemapper(sitemapOptions);
 
     const xmlLinks: string[] = [];
     const siteSpecLinks: string[] = [];
@@ -68,7 +79,7 @@ export class SitemapService implements OnModuleInit {
       switch (site) {
         case Site.BBC:
           const filteredSites = result.sites.filter((url) => {
-            return url.includes('https://www.bbc.com/news/') ? true : false;
+            return url.includes('https://www.bbc.com/news/') && !url.includes('/live/') ? true : false;
           });
           siteSpecLinks.push(...filteredSites);
       }
@@ -85,10 +96,37 @@ export class SitemapService implements OnModuleInit {
   }
 
   async sitemapChecker(sitemap: string, site: Site) {
-    const sitemapLinks = await this.sitemapParse(sitemap, site);
+    const sitemapLinks = await this.sitemapParse(
+      sitemap,
+      site,
+      Date.now() - 600000, // 5 minutes
+    );
     if (sitemapLinks.length > 0) {
       this.logger.debug('Sitemap Links Populated');
       await this.sendSitemapLinks(sitemapLinks);
-    };
+    }
+  }
+
+  async fullsiteOneTimeChecker(sitemap: string, site: Site) {
+    const sitemapLinks = await this.sitemapParse(sitemap, site);
+    if (sitemapLinks.length > 0) {
+      this.logger.debug('Sitemap Links Populated');
+      console.log(sitemapLinks);
+      await this.siteLinksBundler(sitemapLinks);
+      // await this.sendSitemapLinks(sitemapLinks);
+    }
+  }
+
+  async siteLinksBundler(sitemap: string[]) {
+    let bundledArray = [];
+    for (const link of sitemap) {
+      if (bundledArray.length < 2) {
+        bundledArray.push(link);
+      } else {
+        await this.sendSitemapLinks(bundledArray);
+        bundledArray = [];
+        bundledArray.push(link);
+      }
+    }
   }
 }
